@@ -20,7 +20,7 @@ library(rgbif)
 
 # Look up taxon key for "Vespa velutina"
 taxonKey <- name_backbone("Vespa velutina")$usageKey
-# Look up country code for belgium, I did this manually
+# Look up country code for Belgium, I did this manually
 # enumeration_country()
 
 caseStudyDf = occ_data(taxonKey = taxonKey,
@@ -33,9 +33,11 @@ caseStudyDf = occ_data(taxonKey = taxonKey,
 # TODO!
 
 # 4. To present the result as a bar chart of observations per year.
-# easy
+# basic bar plot
 year_table = table(caseStudyDf$data$year)
-barplot(year_table)
+barplot(year_table,
+        main="Observations of Vespa velutina in Belgium from 2019 to 2021",
+        xlab = "Year", ylab = "Observation count")
 
 #map
 library(geojsonio)
