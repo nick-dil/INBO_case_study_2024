@@ -4,7 +4,7 @@
 # By Nick Dillen
 
 # Required packages
-# Use `install.packages("<>")` if not installed
+# Use `install.packages("<package name>")` if not installed
 library(rgbif)
 library(geojsonio)
 library(ggplot2)
@@ -50,13 +50,20 @@ print(nrow(dataFlanders))
 # [1] 2124
 
 # Note, a lot of observations have NA for $stateProvince (887 records), this data would be excluded even if
-# it would be in Flanders.
-# A more robust way to detect observations in Flanders might be to check coordinates against a Flanders polygon shape.
-# You can donload that shape data from https://gadm.org/ -> Belgium (level 1 or greater)
-# also used some articles; https://r-graph-gallery.com/168-load-a-shape-file-into-r.html
+# it would have coordinates in Flanders.
+# A more robust way to detect observations in Flanders might be to check coordinates against a Flanders polygon.
+# You can download that shape data from https://gadm.org/ -> Belgium (level 1 or greater)
+# References used;
+# https://r-graph-gallery.com/168-load-a-shape-file-into-r.html
 # https://r-spatial.org/r/2018/10/25/ggplot2-sf.html
 
-# set working directory accordingly to read in shape data downloaded from GADM
+# Download and unzip geojson data from GADM. Check that you are working in source file directory #getwd()
+temp = tempfile()
+download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_BEL_2.json.zip", temp)
+dir.create("geojson")
+unzip(temp, exdir = "geojson/")
+unlink(temp)
+# set working directory accordingly to read in geojson data downloaded from GADM
 spBE <- geojson_read("geojson/gadm41_BEL_2.json",  what = "sp")
 # Quick plot to check we have what we need
 # plot(spBE)
@@ -77,9 +84,9 @@ dataFlanders = st_filter(dataBE, sfFLanders)
 print(nrow(dataFlanders))
 # [1] 2148
 
-# We gained 2148-2124=24 data points 
+# We gained 2148-2124=24 data points, but is this correct? (see #Extra below)
 # Also note that this code can be rerun and will (generally) be able to identify data points from Flanders
-# even if other languages or spelling are used in the $stateProvince column
+# even if other languages or spelling are used in the $stateProvince column 
 
 #####
 # DATA VISUALISATION
@@ -91,7 +98,7 @@ barplot(year_table,
         xlab = "Year", ylab = "Observation count")
 
 # B. To present the result as a map of observations
-# We build a ggplot object with the shape file of Flanders as a polygon and plot the observations
+# We build a ggplot object with the Flanders polygon and plot the observations
 # from our selected data as points
 vvmap = ggplot() +
   geom_sf(data = sfFLanders) +
@@ -104,9 +111,10 @@ vvmap = ggplot() +
 
 vvmap
 
-# We can also make an interactive map with leaflet, a lot of options here. I chose to include the $occurrenceRemarks 
-# and $year data to give a little bit more info about the data points. If you click on an observation in the leaflet
-# map a popup should appear with the appropriate text. A white stroke corresponds to non-NA (interesting) remark
+# We can also make an interactive map with leaflet, a lot of options here, would depend on the research question.
+# I chose to include the $occurrenceRemarks and $year data to give a little bit more info about the data points.
+# If you click on an observation in the leaflet map a popup should appear with the appropriate text.
+# A white stroke corresponds to markers with a non-NA (i.e. interesting) remark.
 
 leaflet(data=dataFlanders) %>% addTiles() %>%
   addCircleMarkers(stroke = ~!is.na(occurrenceRemarks),
@@ -121,12 +129,13 @@ leaflet(data=dataFlanders) %>% addTiles() %>%
 #####
 # Extra
 # We can do a small check of the observations with possible "mislabeled" $stateProvince. This is easier in leaflet
-# because its interactive and you can zoom in
-table(dataFlanders$stateProvince, useNA = "ifany") # some (4) "Waalse" observations and 24 'NA'.
-# Could call them False Negatives if we take the more "robust" method used above as truth (spoiler: its not)
+# because its interactive and you can zoom in.
+table(dataFlanders$stateProvince, useNA = "ifany")
+# some (4) "Waalse" observations and 24 'NA' are detected as observations from Flanders
+# We could call these points "False Negatives" if we assume the more "robust" method used above as truth (spoiler: its not)
 FNdata = dataFlanders[!dataFlanders$stateProvince %in% flanders,]
-# but also the other way around, points labelled as "vlaanderen" but coordinates outside the shape file exist
-# Call them False Positives
+# but also the other way around, points labelled as "vlaanderen" but coordinates outside the Flanders polygon exist.
+# Call them "False Positives".
 FPdata = st_as_sf(
   caseStudyData$data[caseStudyData$data$stateProvince %in% flanders & !caseStudyData$data$key %in% dataFlanders$key,],
   coords = c("decimalLongitude","decimalLatitude")
@@ -135,7 +144,7 @@ st_crs(FPdata) = st_crs(sfFLanders)
 
 
 
-# visualize predicted FN and FP on map. Also load shapefile of Belgium to verify.
+# visualize predicted FN and FP on map. Also load polygon of Belgium to verify.
 leaflet(sfBE) %>% addTiles() %>% addPolygons(stroke = TRUE, 
                                              label = ~paste(NAME_2)
                                              ) %>%
@@ -144,10 +153,12 @@ leaflet(sfBE) %>% addTiles() %>% addPolygons(stroke = TRUE,
   addCircleMarkers(data = FNdata, stroke = FALSE, fillOpacity = 0.5, color='black', label=~paste0(stateProvince))
   
 
-## !ATTENTION! it seems that the shapefile is low resolution, resulting in some false positives/negatives when 
+## !ATTENTION! it seems that the Flanders polygon is low resolution, resulting in some false positives/negatives when 
 # using it to select data from Flanders only! Everything with an nonNA $stateProvince is correctly labeled. 
 # But there are also some observations the have an NA $stateProvince that should be in the Flanders selection. 
-# I need to get a higher res shape of the Belgian regions to resolve this correctly.
+# We need to get a higher res shape of the Belgian regions to resolve this correctly.
+# For now I would just work with the "quick and dirty" approach of filtering Flanders data as it yields only 
+# "True Positive" Flanders observations (but it misses some point with NA vale in $stateProvince)
 
   
  
